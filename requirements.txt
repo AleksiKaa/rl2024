@@ -1,0 +1,17 @@
+pyyaml
+torch
+gymnasium
+gym
+numpy
+pandas
+matplotlib
+imageio
+seaborn
+scikit-learn
+hydra-core
+dm-env
+dm-control
+mediapy
+bsuite
+pygame
+ipdb
