@@ -325,7 +325,7 @@ class SandingEnv(core.Env):
 
     def step(self, a):
         try:
-            a = a.numpy()
+            a = a.cpu().numpy()
         except:
             a = np.array(a)
         a = self.MAX_SIZE * a
