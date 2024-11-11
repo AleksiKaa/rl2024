@@ -68,13 +68,11 @@ class DDPGAgent(BaseAgent):
         x = torch.from_numpy(observation).float().to(self.device)
 
         if (
-            self.buffer_ptr < self.random_transition
+            self.buffer_ptr < self.random_transition and not evaluation
         ):  # collect random trajectories for better exploration.
             action = torch.rand(self.action_dim, device=self.device)
         else:
-            expl_noise = (
-                0.1 * self.max_action
-            )  # the stddev of the expl_noise if not evaluation
+            expl_noise = 0.3  # the stddev of the expl_noise if not evaluation
             action = self.pi(x)
 
             if not evaluation:
@@ -131,9 +129,7 @@ class DDPGAgent(BaseAgent):
         actor_loss.backward()
         self.pi_optim.step()
 
-        """
-        # TODO: update the target q and pi using u.soft_update_params() (See the DQN code)
-        """
+        # update the target q and pi using soft_update_params()
         self.soft_update_params(self.pi, self.pi_target, self.tau)
         self.soft_update_params(self.q, self.q_target, self.tau)
 
