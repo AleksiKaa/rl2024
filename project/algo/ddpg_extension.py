@@ -35,8 +35,7 @@ class DDPGExtension(DDPGAgent):
 
         return discounted_reward
 
-    def lnss_step(self, batch, exp_buffer_ptr):
-
+    def lnss_reward(self, batch, exp_buffer_ptr):
         # Unpack batch
         state = batch.state
         action = batch.action
@@ -44,24 +43,18 @@ class DDPGExtension(DDPGAgent):
         reward = batch.reward
         not_done = batch.not_done
 
-        # Current timestep transition
-        state_0, action_0, next_state_1, not_done_1 = (
+        r_0 = reward[exp_buffer_ptr]
+        reward_buffer = reward[exp_buffer_ptr + 1 :]
+        discounted_reward = self.discount_rewards(reward_buffer, r_0)
+
+        # Return current state transition with discounted reward
+        return (
             state[exp_buffer_ptr],
             action[exp_buffer_ptr],
             next_state[exp_buffer_ptr],
+            discounted_reward,
             not_done[exp_buffer_ptr],
         )
-
-        # Current reward
-        r_0 = reward[exp_buffer_ptr]
-        exp_buffer_ptr += 1
-        reward_buffer = reward[exp_buffer_ptr:]
-
-        discounted_reward = self.discount_rewards(reward_buffer, r_0)
-        # Finally append r^prime to experience replay buffer
-        self.record(state_0, action_0, next_state_1, discounted_reward, not_done_1)
-        # Return total episode reward
-        return discounted_reward
 
     def train_iteration(self):
         # start = time.perf_counter()
@@ -77,6 +70,8 @@ class DDPGExtension(DDPGAgent):
             int(float(self.cfg.buffer_size)),
         )
         exp_buffer_ptr = 0
+
+        # Loop until finished
         while not done:
 
             # Sample action from policy
@@ -89,79 +84,48 @@ class DDPGExtension(DDPGAgent):
             done_bool = float(done) if timesteps < self.max_episode_steps else 0
 
             # Record to replay buffer
-            # exp_buffer_ptr += 1
             exp_buffer.add(obs, action, next_obs, reward, done_bool)
 
-            # Get transitions from temp buffer starting from current time step
+            # Get transitions from temp buffer
             batch = exp_buffer.get_all(device=self.device)
 
-            # Unpack batch
-            state = batch.state
-            action = batch.action
-            next_state = batch.next_state
-            reward = batch.reward
-            not_done = batch.not_done
-
+            # Enough data collected in temporary buffer, update permanent buffer
             if exp_buffer.size >= self.n_step:
-                # Current timestep transition
-                state_0, action_0, next_state_1, not_done_1 = (
-                    state[exp_buffer_ptr],
-                    action[exp_buffer_ptr],
-                    next_state[exp_buffer_ptr],
-                    not_done[exp_buffer_ptr],
+                # Calculate LNSS reward and store total episode reward
+                state_0, action_0, state_1, r_0, not_done_1 = self.lnss_reward(
+                    batch, exp_buffer_ptr
                 )
 
-                # Current reward
-                r_0 = reward[exp_buffer_ptr]
+                # Update buffer pointer, total reward and timestep
                 exp_buffer_ptr += 1
-                reward_buffer = reward[exp_buffer_ptr:]
-
-                discounted_reward = self.discount_rewards(reward_buffer, r_0)
+                reward_sum += r_0
+                timesteps += 1
 
                 # Finally append r^prime to experience replay buffer
-                self.record(
-                    state_0, action_0, next_state_1, discounted_reward, not_done_1
-                )
-
-                # Store total episode reward
-                reward_sum += self.lnss_step(batch, exp_buffer_ptr)
-                timesteps += 1
+                self.record(state_0, action_0, state_1, r_0, not_done_1)
 
             if timesteps >= self.max_episode_steps:
                 done = True
 
             # Need to calculate rest of rewards
             if done:
-
                 while exp_buffer_ptr < exp_buffer.size:
-
-                    # Current timestep transition
-                    state_0, action_0, next_state_1, not_done_1 = (
-                        state[exp_buffer_ptr],
-                        action[exp_buffer_ptr],
-                        next_state[exp_buffer_ptr],
-                        not_done[exp_buffer_ptr],
+                    # Calculate LNSS reward and store total episode reward
+                    state_0, action_0, state_1, r_0, not_done_1 = self.lnss_reward(
+                        batch, exp_buffer_ptr
                     )
 
-                    # Current reward
-                    r_0 = reward[exp_buffer_ptr]
+                    # Update buffer pointer and timestep
                     exp_buffer_ptr += 1
-                    reward_buffer = reward[exp_buffer_ptr:]
-                    discounted_reward = self.discount_rewards(reward_buffer, r_0)
-
-                    # Finally append r^prime to experience replay buffer
-                    self.record(
-                        state_0, action_0, next_state_1, discounted_reward, not_done_1
-                    )
-
-                    # Store total episode reward
-                    reward_sum += discounted_reward
                     timesteps += 1
 
-            # update observation
+                    # Finally append r^prime to experience replay buffer
+                    self.record(state_0, action_0, state_1, r_0, not_done_1)
+
+            # Update observation
             obs = next_obs.copy()
 
-        # update the policy after one episode
+        # Update the policy after one episode
         # s = time.perf_counter()
         info = self.update()
         # e = time.perf_counter()
@@ -174,5 +138,6 @@ class DDPGExtension(DDPGAgent):
             }
         )
 
-        end = time.perf_counter()
+        # end = time.perf_counter()
+
         return info
