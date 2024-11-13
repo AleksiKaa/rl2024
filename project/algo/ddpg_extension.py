@@ -91,18 +91,18 @@ class DDPGExtension(DDPGAgent):
 
             # Enough data collected in temporary buffer, update permanent buffer
             if exp_buffer.size >= self.n_step:
-                # Calculate LNSS reward and store total episode reward
-                state_0, action_0, state_1, r_0, not_done_1 = self.lnss_reward(
+                # Calculate LNSS reward with state transition
+                state_0, action_0, state_1, r_prime, not_done_1 = self.lnss_reward(
                     batch, exp_buffer_ptr
                 )
 
                 # Update buffer pointer, total reward and timestep
                 exp_buffer_ptr += 1
-                reward_sum += r_0
+                reward_sum += reward
                 timesteps += 1
 
                 # Finally append r^prime to experience replay buffer
-                self.record(state_0, action_0, state_1, r_0, not_done_1)
+                self.record(state_0, action_0, state_1, r_prime, not_done_1)
 
             if timesteps >= self.max_episode_steps:
                 done = True
@@ -110,17 +110,18 @@ class DDPGExtension(DDPGAgent):
             # Need to calculate rest of rewards
             if done:
                 while exp_buffer_ptr < exp_buffer.size:
-                    # Calculate LNSS reward and store total episode reward
-                    state_0, action_0, state_1, r_0, not_done_1 = self.lnss_reward(
+                    # Calculate LNSS reward with state transition
+                    state_0, action_0, state_1, r_prime, not_done_1 = self.lnss_reward(
                         batch, exp_buffer_ptr
                     )
 
                     # Update buffer pointer and timestep
                     exp_buffer_ptr += 1
+                    reward_sum += reward
                     timesteps += 1
 
                     # Finally append r^prime to experience replay buffer
-                    self.record(state_0, action_0, state_1, r_0, not_done_1)
+                    self.record(state_0, action_0, state_1, r_prime, not_done_1)
 
             # Update observation
             obs = next_obs.copy()
@@ -134,7 +135,7 @@ class DDPGExtension(DDPGAgent):
         info.update(
             {
                 "episode_length": timesteps,
-                "ep_reward": reward_sum.cpu().item(),
+                "ep_reward": reward_sum#.cpu().item(),
             }
         )
 
