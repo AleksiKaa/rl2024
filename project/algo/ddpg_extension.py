@@ -20,6 +20,7 @@ class DDPGExtension(DDPGAgent):
 
         self.name = "ddpg_extension"
         self.n_step = n_step
+        self.random_transition = 5000  # Hyperparameter to be tuned
 
     def discount_rewards(self, rewards, r_0):
         # Calculate discounted rewards G
@@ -96,10 +97,8 @@ class DDPGExtension(DDPGAgent):
                     batch, exp_buffer_ptr
                 )
 
-                # Update buffer pointer, total reward and timestep
+                # Update buffer pointer
                 exp_buffer_ptr += 1
-                reward_sum += reward
-                timesteps += 1
 
                 # Finally append r^prime to experience replay buffer
                 self.record(state_0, action_0, state_1, r_prime, not_done_1)
@@ -115,16 +114,16 @@ class DDPGExtension(DDPGAgent):
                         batch, exp_buffer_ptr
                     )
 
-                    # Update buffer pointer and timestep
+                    # Update buffer pointer
                     exp_buffer_ptr += 1
-                    reward_sum += reward
-                    timesteps += 1
 
                     # Finally append r^prime to experience replay buffer
                     self.record(state_0, action_0, state_1, r_prime, not_done_1)
 
-        # Update observation
-        obs = next_obs.copy()
+            # Update observation, episode rewards and timestep
+            obs = next_obs.copy()
+            reward_sum += reward
+            timesteps += 1
 
         # Update the policy after one episode
         # s = time.perf_counter()
@@ -133,7 +132,5 @@ class DDPGExtension(DDPGAgent):
 
         # Return stats of training
         info.update({"episode_length": timesteps, "ep_reward": reward_sum})
-
-        # end = time.perf_counter()
 
         return info
