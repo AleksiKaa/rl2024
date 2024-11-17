@@ -29,9 +29,8 @@ class DDPGExtension(DDPGAgent):
         state, action, next_state, reward, not_done = self.exp_buffer.popleft()
 
         # Calculate discounted rewards G
-        r_0 = reward
         gamma = self.gamma  # For discounting future timesteps
-        discounted_reward = r_0
+        discounted_reward = reward
         for _, _, _, r_i, _ in self.exp_buffer:
             discounted_reward += r_i * gamma
             gamma *= self.gamma
