@@ -68,7 +68,7 @@ class DDPGExtension(DDPGAgent):
         exp_buffer = ReplayBuffer(
             self.observation_space_dim,
             self.action_dim,
-            int(float(self.cfg.buffer_size)),
+            int(float(self.max_episode_steps)),
         )
         exp_buffer_ptr = 0
 
@@ -80,8 +80,6 @@ class DDPGExtension(DDPGAgent):
 
             # Perform the action on the environment, get new state and reward
             next_obs, reward, done, _, _ = self.env.step(to_numpy(action))
-
-            # Store action's outcome (so that the agent can improve its policy)
             done_bool = float(done) if timesteps < self.max_episode_steps else 0
 
             # Record to replay buffer
