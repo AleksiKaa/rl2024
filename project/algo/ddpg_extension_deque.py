@@ -80,19 +80,17 @@ class DDPGExtension(DDPGAgent):
             if timesteps >= self.max_episode_steps:
                 done = True
 
-            if done:
-                # Need to calculate rest of rewards
-                while len(self.exp_buffer):
-                    # Calculate LNSS reward with state transition
-                    state_0, action_0, state_1, r_prime, not_done_1 = self.lnss_reward()
-
-                    # Append r^prime to experience replay buffer
-                    self.record(state_0, action_0, state_1, r_prime, not_done_1)
-
             # Update observation, episode rewards and timestep
             obs = next_obs.copy()
             reward_sum += reward
             timesteps += 1
+
+        # Need to calculate rest of rewards
+        while len(self.exp_buffer):
+            # Calculate LNSS reward with state transition
+            state_0, action_0, state_1, r_prime, not_done_1 = self.lnss_reward()
+            # Append r^prime to experience replay buffer
+            self.record(state_0, action_0, state_1, r_prime, not_done_1)
 
         # Update the policy after one episode
         # s = time.perf_counter()
@@ -101,5 +99,4 @@ class DDPGExtension(DDPGAgent):
 
         # Return stats of training
         info.update({"episode_length": timesteps, "ep_reward": reward_sum})
-
         return info
