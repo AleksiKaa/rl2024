@@ -62,7 +62,7 @@ class DDPGAgent(BaseAgent):
         return info
 
     @torch.no_grad()
-    def get_action(self, observation, evaluation=False):
+    def get_action(self, observation, evaluation=False, expl_noise=0.3):
         if observation.ndim == 1:
             observation = observation[None]  # add the batch dimension
         x = torch.from_numpy(observation).float().to(self.device)
@@ -72,13 +72,14 @@ class DDPGAgent(BaseAgent):
         ):  # collect random trajectories for better exploration.
             action = torch.rand(self.action_dim, device=self.device)
         else:
-            expl_noise = 0.3  # the stddev of the expl_noise if not evaluation
             action = self.pi(x)
 
             if not evaluation:
                 action += torch.normal(
-                    torch.zeros(action.size()), torch.full(action.size(), expl_noise)
+                    torch.zeros(action.size()),
+                    torch.full(action.size(), self.max_action * expl_noise),
                 ).to(self.device)
+                action.clip(-self.max_action, self.max_action)
 
         return action, {}  # just return a positional value
 

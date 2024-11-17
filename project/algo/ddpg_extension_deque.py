@@ -22,16 +22,17 @@ class DDPGExtension(DDPGAgent):
         self.name = "ddpg_extension"
         self.n_step = n_step
         self.random_transition = 5000  # Hyperparameter to be tuned
+        self.exp_buffer = deque()  # Queue for storing experiences
 
-    def lnss_reward(self, exp_buffer):
+    def lnss_reward(self):
         # Unpack transition
-        state, action, next_state, reward, not_done = exp_buffer.popleft()
+        state, action, next_state, reward, not_done = self.exp_buffer.popleft()
 
         # Calculate discounted rewards G
         r_0 = reward
         gamma = self.gamma  # For discounting future timesteps
         discounted_reward = r_0
-        for _, _, _, r_i, _ in exp_buffer:
+        for _, _, _, r_i, _ in self.exp_buffer:
             discounted_reward += r_i * gamma
             gamma *= self.gamma
 
@@ -55,9 +56,6 @@ class DDPGExtension(DDPGAgent):
         # Reset the environment and observe the initial state
         obs, _ = self.env.reset()
 
-        # Queue for storing experiences
-        exp_buffer = deque()
-
         # Loop until finished
         while not done:
 
@@ -69,16 +67,14 @@ class DDPGExtension(DDPGAgent):
             done_bool = float(done) if timesteps < self.max_episode_steps else 0
 
             # Record to experience buffer
-            exp_buffer.append((obs, action, next_obs, reward, done_bool))
+            self.exp_buffer.append((obs, action, next_obs, reward, done_bool))
 
             # Enough data collected in temporary buffer, update permanent buffer
-            if len(exp_buffer) >= self.n_step:
+            if len(self.exp_buffer) >= self.n_step:
                 # Calculate LNSS reward with state transition
-                state_0, action_0, state_1, r_prime, not_done_1 = self.lnss_reward(
-                    exp_buffer
-                )
+                state_0, action_0, state_1, r_prime, not_done_1 = self.lnss_reward()
 
-                # Finally append r^prime to experience replay buffer
+                # Append r^prime to experience replay buffer
                 self.record(state_0, action_0, state_1, r_prime, not_done_1)
 
             if timesteps >= self.max_episode_steps:
@@ -86,13 +82,11 @@ class DDPGExtension(DDPGAgent):
 
             if done:
                 # Need to calculate rest of rewards
-                while len(exp_buffer):
+                while len(self.exp_buffer):
                     # Calculate LNSS reward with state transition
-                    state_0, action_0, state_1, r_prime, not_done_1 = self.lnss_reward(
-                        exp_buffer
-                    )
+                    state_0, action_0, state_1, r_prime, not_done_1 = self.lnss_reward()
 
-                    # Finally append r^prime to experience replay buffer
+                    # Append r^prime to experience replay buffer
                     self.record(state_0, action_0, state_1, r_prime, not_done_1)
 
             # Update observation, episode rewards and timestep

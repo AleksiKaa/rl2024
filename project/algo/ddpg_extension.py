@@ -20,7 +20,6 @@ class DDPGExtension(DDPGAgent):
 
         self.name = "ddpg_extension"
         self.n_step = n_step
-        self.random_transition = 5000  # Hyperparameter to be tuned
 
     def discount_rewards(self, rewards, r_0):
         # Calculate discounted rewards G
