@@ -1,13 +1,5 @@
-from .agent_base import BaseAgent
-from .ddpg_utils import Policy, Critic, ReplayBuffer
+from .ddpg_utils import ReplayBuffer
 from .ddpg_agent import DDPGAgent
-
-import utils.common_utils as cu
-import torch
-import numpy as np
-import torch.nn.functional as F
-import copy, time
-from pathlib import Path
 
 
 def to_numpy(tensor):
@@ -90,15 +82,13 @@ class DDPGExtension(DDPGAgent):
             # Enough data collected in temporary buffer, update permanent buffer
             if exp_buffer.size >= self.n_step:
                 # Calculate LNSS reward with state transition
-                state_0, action_0, state_1, r_prime, not_done_1 = self.lnss_reward(
-                    batch, exp_buffer_ptr
-                )
+                transition = self.lnss_reward(batch, exp_buffer_ptr)
 
                 # Update buffer pointer
                 exp_buffer_ptr += 1
 
-                # Finally append r^prime to experience replay buffer
-                self.record(state_0, action_0, state_1, r_prime, not_done_1)
+                # Finally append r^prime with transition to experience replay buffer
+                self.record(*transition)
 
             if timesteps >= self.max_episode_steps:
                 done = True
@@ -107,15 +97,13 @@ class DDPGExtension(DDPGAgent):
                 # Need to calculate rest of rewards
                 while exp_buffer_ptr < exp_buffer.size:
                     # Calculate LNSS reward with state transition
-                    state_0, action_0, state_1, r_prime, not_done_1 = self.lnss_reward(
-                        batch, exp_buffer_ptr
-                    )
+                    transition = self.lnss_reward(batch, exp_buffer_ptr)
 
                     # Update buffer pointer
                     exp_buffer_ptr += 1
 
-                    # Finally append r^prime to experience replay buffer
-                    self.record(state_0, action_0, state_1, r_prime, not_done_1)
+                    # Finally append r^prime with transition to experience replay buffer
+                    self.record(*transition)
 
             # Update observation, episode rewards and timestep
             obs = next_obs.copy()
